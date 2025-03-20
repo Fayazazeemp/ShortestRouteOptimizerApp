@@ -1,0 +1,162 @@
+﻿@{
+    ViewData["Title"] = "Shortest Path Finder";
+}
+
+<!-- Bootstrap Styles -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            <h2 class="mb-4 text-primary">Find Shortest Route</h2>
+            <form method="post" asp-action="FindShortestPath">
+                <div class="mb-3">
+                    <label class="form-label">From:</label>
+                    <select name="fromNode" class="form-select">
+                        @foreach (var node in ViewBag.Nodes)
+                        {
+                            <option value="@node">@node</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">To:</label>
+                    <select name="toNode" class="form-select">
+                        @foreach (var node in ViewBag.Nodes)
+                        {
+                            <option value="@node">@node</option>
+                        }
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100">Find Route</button>
+            </form>
+
+            @if (ViewBag.Path != null)
+            {
+                <div class="mt-4 p-3 bg-light rounded border">
+                    <h4 class="text-success">
+                        Shortest Path from <span class="fw-bold">@ViewBag.SelectedFrom</span> to
+                        <span class="fw-bold">@ViewBag.SelectedTo</span>:
+                        <span class="fw-bold text-danger">@ViewBag.Path</span>
+                    </h4>
+                    <h5 class="text-dark">Total Distance: <span class="fw-bold">@ViewBag.Distance</span></h5>
+                </div>
+            }
+        </div>
+
+        <!-- Graph Visualization -->
+        <div class="col-md-6">
+            <h3 class="text-primary">Graph Visualization</h3>
+            <div id="graph-container" class="border p-3 bg-white rounded shadow"></div>
+        </div>
+    </div>
+</div>
+
+<!-- D3.js for Graph Rendering -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var graphData = {
+    nodes: [
+        { id: "A" }, { id: "B" }, { id: "C" }, { id: "D" }, { id: "E" },
+        { id: "F" }, { id: "G" }, { id: "H" }, { id: "I" }
+    ],
+    links: [
+        { source: "A", target: "B", distance: 4 },
+        { source: "A", target: "C", distance: 6 },
+
+        { source: "B", target: "A", distance: 4 },
+        { source: "B", target: "F", distance: 2 },
+
+        { source: "C", target: "A", distance: 6 },
+        { source: "C", target: "D", distance: 8 },
+
+        { source: "D", target: "C", distance: 8 },
+        { source: "D", target: "E", distance: 4 },
+        { source: "D", target: "G", distance: 1 },
+
+        { source: "E", target: "B", distance: 2 },
+        { source: "E", target: "D", distance: 4 },
+        { source: "E", target: "F", distance: 3 },
+        { source: "E", target: "I", distance: 8 },
+
+        { source: "F", target: "B", distance: 2 },
+        { source: "F", target: "E", distance: 3 },
+        { source: "F", target: "G", distance: 4 },
+        { source: "F", target: "H", distance: 6 },
+
+        { source: "G", target: "H", distance: 5 },
+        { source: "G", target: "D", distance: 1 },
+        { source: "G", target: "F", distance: 4 },
+        { source: "G", target: "I", distance: 5 },
+
+        { source: "H", target: "F", distance: 6 },
+        { source: "H", target: "G", distance: 5 },
+
+        { source: "I", target: "E", distance: 8 },
+        { source: "I", target: "G", distance: 5 }
+    ]
+};
+
+
+        var width = 400, height = 300;
+        var svg = d3.select("#graph-container")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+        var simulation = d3.forceSimulation(graphData.nodes)
+            .force("link", d3.forceLink(graphData.links).id(d => d.id).distance(d => d.distance * 10))
+            .force("charge", d3.forceManyBody().strength(-100))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        var link = svg.append("g")
+            .selectAll("line")
+            .data(graphData.links)
+            .enter().append("line")
+            .style("stroke", "#999")
+            .style("stroke-width", "2px");
+
+        var node = svg.append("g")
+            .selectAll("circle")
+            .data(graphData.nodes)
+            .enter().append("circle")
+            .attr("r", 10)
+            .attr("fill", "#007bff");
+
+        var text = svg.append("g")
+            .selectAll("text")
+            .data(graphData.nodes)
+            .enter().append("text")
+            .attr("dx", 12)
+            .attr("dy", ".35em")
+            .text(d => d.id);
+
+        simulation.on("tick", () => {
+            link.attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node.attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            text.attr("x", d => d.x)
+                .attr("y", d => d.y);
+        });
+
+        // Highlight shortest path
+        var shortestPathNodes = "@ViewBag.Path".split(", ");
+        link.style("stroke", function (d) {
+            return shortestPathNodes.includes(d.source.id) && shortestPathNodes.includes(d.target.id) ? "red" : "#999";
+        }).style("stroke-width", function (d) {
+            return shortestPathNodes.includes(d.source.id) && shortestPathNodes.includes(d.target.id) ? "4px" : "2px";
+        });
+
+        node.attr("fill", function (d) {
+            return shortestPathNodes.includes(d.id) ? "green" : "#007bff";
+        });
+    });
+</script>
